@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Studio — ClipHeist</title>
+  <meta name="description" content="ClipHeist Studio: trim, reframe, add effects and transitions, and export frame-exact gameplay clips in your browser.">
+  <meta name="theme-color" content="#0a0910">
+  <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body class="studio">
+
+<header class="studio-bar">
+  <a class="brand" href="index.html" title="Back to home"><img src="assets/img/logo.svg" alt="" width="28" height="28"><span>Clip<b>Heist</b></span><em>Studio</em></a>
+  <div class="bar-center">
+    <span id="fileName" class="file-name">No footage loaded</span>
+    <span id="srcInfo" class="src-info"></span>
+  </div>
+  <div class="bar-actions">
+    <button class="btn ghost" id="btnOpen" type="button">Open footage</button>
+    <button class="btn ai-btn" id="btnAiEdit" type="button" disabled title="Auto-edit your best moments">✨ AI Edit</button>
+    <button class="btn primary" id="btnExport" type="button" disabled>Export &amp; Share</button>
+  </div>
+  <input type="file" id="fileInput" accept="video/*,.mkv,.mov,.m4v,.webm" hidden>
+</header>
+
+<main class="studio-grid">
+  <!-- ============ LEFT: marks + reel ============ -->
+  <aside class="panel left">
+    <section>
+      <h3>Clip it</h3>
+      <div class="quick-marks">
+        <button type="button" data-back="15" disabled>Last 15s</button>
+        <button type="button" data-back="30" disabled>Last 30s</button>
+        <button type="button" data-back="60" disabled>Last 60s</button>
+      </div>
+      <p class="hint">Marks a range that ends at the playhead, like a replay buffer.</p>
+      <div class="inout">
+        <div class="in"><label>In</label><output id="inLabel">0:00.00</output><button type="button" id="btnSetIn" disabled>Set In <kbd>I</kbd></button></div>
+        <div class="out"><label>Out</label><output id="outLabel">0:00.00</output><button type="button" id="btnSetOut" disabled>Set Out <kbd>O</kbd></button></div>
+      </div>
+      <button class="btn accent block" type="button" id="btnAddClip" disabled>+ Add range to reel <kbd>A</kbd></button>
+    </section>
+
+    <section>
+      <h3>Reel <span class="pill" id="reelDur">0:00</span></h3>
+      <ol id="clipList" class="clip-list"></ol>
+      <p class="hint" id="clipEmpty">No clips in the reel yet. If the reel is empty, export uses the current In/Out range. Add two or more clips to use transitions.</p>
+      <div class="reel-actions" id="reelActions" hidden>
+        <button class="btn sm accent" type="button" id="btnPlayReel">▶ Play reel <kbd>R</kbd></button>
+        <button class="btn sm ghost" type="button" id="btnClearReel">Clear</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Shortcuts</h3>
+      <ul class="keys">
+        <li>Play / pause <span><kbd>Space</kbd></span></li>
+        <li>Set In / Out <span><kbd>I</kbd> <kbd>O</kbd></span></li>
+        <li>Add to reel <span><kbd>A</kbd></span></li>
+        <li>Play reel <span><kbd>R</kbd></span></li>
+        <li>Frame step <span><kbd>←</kbd> <kbd>→</kbd></span></li>
+        <li>Jump 1s <span><kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd></span></li>
+        <li>Jump 5s <span><kbd>J</kbd> <kbd>L</kbd></span></li>
+        <li>Snapshot frame <span><kbd>P</kbd></span></li>
+      </ul>
+    </section>
+  </aside>
+
+  <!-- ============ CENTER: stage ============ -->
+  <section class="stage">
+    <div class="viewport-wrap">
+      <div class="viewport" id="viewport">
+        <canvas id="canvas" width="1920" height="1080" aria-label="Preview of your edited clip"></canvas>
+        <div class="dropzone" id="dropzone" role="button" tabindex="0">
+          <div>
+            <div class="dz-icon">＋</div>
+            <h2 class="display">Drop gameplay footage</h2>
+            <p>or click to choose a file: MP4, MOV, WebM or MKV</p>
+            <span class="btn primary">Choose video</span>
+            <small>Your footage stays on this device. Nothing is uploaded.</small>
+          </div>
+        </div>
+        <div class="fps-meter" id="fpsMeter" hidden></div>
+        <div class="rec-overlay" id="recOverlay" hidden>
+          <div class="rec-count" id="recCount">3</div>
+          <div class="rec-bar">
+            <span class="rec-dot"></span><b id="recTime">0:00</b>
+            <span class="rec-meter"><i id="recMeter"></i></span>
+            <button class="btn sm" type="button" id="btnRecStop">■ Stop</button>
+            <button class="btn sm ghost" type="button" id="btnRecCancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="transport">
+      <button class="tbtn" type="button" data-step="-5" title="Back 5s (J)" disabled>« 5s</button>
+      <button class="tbtn" type="button" data-step="-frame" title="Previous frame (←)" disabled>‹</button>
+      <button class="tbtn play" type="button" id="btnPlay" title="Play / pause (Space)" disabled>▶</button>
+      <button class="tbtn" type="button" data-step="frame" title="Next frame (→)" disabled>›</button>
+      <button class="tbtn" type="button" data-step="5" title="Forward 5s (L)" disabled>5s »</button>
+      <div class="timecode" id="timecode">0:00.00 <span>/ 0:00.00</span></div>
+      <div class="spacer"></div>
+      <select id="speedSel" data-bind="speed" data-num title="Playback &amp; export speed">
+        <option value="0.25">0.25× slow-mo</option>
+        <option value="0.5">0.5× slow-mo</option>
+        <option value="0.75">0.75×</option>
+        <option value="1">1× speed</option>
+        <option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option>
+        <option value="2">2× fast</option>
+      </select>
+      <label class="toggle" title="Loop the In/Out range"><input type="checkbox" data-bind="loop">⟲ Loop</label>
+      <label class="toggle" title="Show the areas each platform's buttons cover (preview only)"><input type="checkbox" data-bind="safe">▣ Safe</label>
+      <button class="tbtn" type="button" id="btnSnap" title="Save current frame as PNG thumbnail (P)" disabled>📷</button>
+    </div>
+
+    <div class="timeline-wrap">
+      <div class="timeline" id="timeline">
+        <div class="thumbs" id="thumbs"></div>
+        <div class="tl-range" id="tlRange" hidden>
+          <div class="handle in" data-h="in" title="Drag to set In"></div>
+          <div class="handle out" data-h="out" title="Drag to set Out"></div>
+        </div>
+        <div class="tl-segs" id="tlSegs"></div>
+        <canvas class="heat" id="heat" hidden title="AI excitement heat map"></canvas>
+        <div class="playhead" id="playhead" style="left:0"></div>
+      </div>
+      <div class="ruler" id="ruler"></div>
+    </div>
+  </section>
+
+  <!-- ============ RIGHT: inspector ============ -->
+  <aside class="panel right">
+    <nav class="tabs" role="tablist">
+      <button type="button" role="tab" data-tab="format" aria-selected="true">Format</button>
+      <button type="button" role="tab" data-tab="look" aria-selected="false">Look</button>
+      <button type="button" role="tab" data-tab="fx" aria-selected="false">FX</button>
+      <button type="button" role="tab" data-tab="text" aria-selected="false">Text</button>
+      <button type="button" role="tab" data-tab="audio" aria-selected="false">Audio</button>
+      <button type="button" role="tab" data-tab="post" aria-selected="false">Post</button>
+    </nav>
+
+    <!-- FORMAT -->
+    <div class="tab-panel" data-panel="format">
+      <section>
+        <h3>Platform preset</h3>
+        <div class="presets" id="presetGrid"></div>
+      </section>
+      <section>
+        <h3>Framing</h3>
+        <div class="field">
+          <div class="seg">
+            <label><input type="radio" name="frame" value="fill" data-bind="frame">Crop to fill</label>
+            <label><input type="radio" name="frame" value="fit" data-bind="frame">Fit + blur</label>
+          </div>
+        </div>
+        <div class="field"><label>Zoom <output data-out="zoom" data-unit="%"></output></label><input type="range" min="100" max="300" step="1" data-bind="zoom"></div>
+        <div class="field"><label>Pan horizontal <output data-out="panX" data-unit="%"></output></label><input type="range" min="0" max="100" step="0.5" data-bind="panX"></div>
+        <div class="field"><label>Pan vertical <output data-out="panY" data-unit="%"></output></label><input type="range" min="0" max="100" step="0.5" data-bind="panY"></div>
+        <button class="btn sm block" type="button" id="btnRecenter">Re-center framing</button>
+        <label class="check"><input type="checkbox" data-bind="autoReframe"> ✨ Auto-reframe: follow the action (uses AI Edit analysis)</label>
+        <p class="hint">For vertical formats, use <b>Crop to fill</b> and drag Pan horizontal to follow the action.</p>
+      </section>
+      <section>
+        <h3>Frame rate &amp; quality</h3>
+        <div class="field">
+          <label for="fpsSel">Output frame rate</label>
+          <select class="input" id="fpsSel" data-bind="outFps"></select>
+          <p class="hint" id="fpsHint">Load a clip to detect its frame rate.</p>
+        </div>
+        <div class="field">
+          <label for="bitrateSel">Bitrate</label>
+          <select class="input" id="bitrateSel" data-bind="bitrate" data-num>
+            <option value="6">Light: 6 Mbps (Discord, X)</option>
+            <option value="12">High: 12 Mbps</option>
+            <option value="16">Creator: 16 Mbps (recommended)</option>
+            <option value="25">Ultra: 25 Mbps</option>
+            <option value="45">Max: 45 Mbps (1440p / 4K)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="engineSel">Render engine</label>
+          <select class="input" id="engineSel" data-bind="engine">
+            <option value="auto">Frame-exact (recommended)</option>
+            <option value="realtime">Real-time capture (compatibility)</option>
+          </select>
+          <p class="hint" id="engineHint"></p>
+        </div>
+        <div class="field">
+          <label for="containerSel">File format</label>
+          <select class="input" id="containerSel" data-bind="container">
+            <option value="auto">MP4 (H.264)</option>
+            <option value="webm">WebM (real-time engine only)</option>
+          </select>
+        </div>
+      </section>
+    </div>
+
+    <!-- LOOK -->
+    <div class="tab-panel" data-panel="look" hidden>
+      <section>
+        <h3>Looks</h3>
+        <div class="chips" id="lookChips"></div>
+      </section>
+      <section>
+        <h3>Adjust</h3>
+        <div class="field"><label>Brightness <output data-out="brightness" data-unit="%"></output></label><input type="range" min="50" max="150" data-bind="brightness"></div>
+        <div class="field"><label>Contrast <output data-out="contrast" data-unit="%"></output></label><input type="range" min="50" max="170" data-bind="contrast"></div>
+        <div class="field"><label>Saturation <output data-out="saturation" data-unit="%"></output></label><input type="range" min="0" max="200" data-bind="saturation"></div>
+        <div class="field"><label>Color tint <output data-out="tintAmt" data-unit="%"></output></label>
+          <div class="row"><input type="color" data-bind="tint"><input type="range" min="0" max="60" data-bind="tintAmt"></div>
+        </div>
+        <div class="field"><label>Vignette <output data-out="vignette" data-unit="%"></output></label><input type="range" min="0" max="85" data-bind="vignette"></div>
+        <label class="check"><input type="checkbox" data-bind="bars"> Cinematic letterbox bars</label>
+        <p class="hint" id="filterHint" hidden>Your browser doesn't support canvas color filters, so brightness, contrast and saturation are skipped. Tint and vignette still work.</p>
+      </section>
+      <section>
+        <h3>Fades</h3>
+        <div class="field"><label>Fade in from black <output data-out="fadeIn" data-unit="s"></output></label><input type="range" min="0" max="2" step="0.1" data-bind="fadeIn"></div>
+        <div class="field"><label>Fade out to black <output data-out="fadeOut" data-unit="s"></output></label><input type="range" min="0" max="3" step="0.1" data-bind="fadeOut"></div>
+      </section>
+    </div>
+
+    <!-- FX -->
+    <div class="tab-panel" data-panel="fx" hidden>
+      <section>
+        <h3>Effect presets</h3>
+        <div class="chips" id="fxPresets"></div>
+      </section>
+      <section>
+        <h3>Effects</h3>
+        <div id="fxList" class="fx-list"></div>
+      </section>
+      <section>
+        <h3>Transitions <span class="pill" id="transCount">0 cuts</span></h3>
+        <div class="trans-grid" id="transGrid"></div>
+        <div class="field" style="margin-top:12px"><label>Duration <output data-out="transDur" data-unit="s"></output></label><input type="range" min="0.15" max="1.5" step="0.05" data-bind="transDur"></div>
+        <label class="check"><input type="checkbox" data-bind="transSfx"> Whoosh sound on transitions</label>
+        <button class="btn sm accent block" type="button" id="btnPreviewTrans" disabled>▶ Preview reel with transitions</button>
+        <p class="hint">Transitions play between clips in your reel. You can override the transition for each clip in the reel list. Each transition blends from the last frame of the previous clip into the next one.</p>
+      </section>
+    </div>
+
+    <!-- TEXT -->
+    <div class="tab-panel" data-panel="text" hidden>
+      <section>
+        <h3>Caption</h3>
+        <div class="field"><textarea data-bind="caption" rows="2" maxlength="140" placeholder="e.g. Wait for it…"></textarea></div>
+        <div class="field">
+          <div class="lbl">Position</div>
+          <div class="seg">
+            <label><input type="radio" name="cpos" value="top" data-bind="captionPos">Top</label>
+            <label><input type="radio" name="cpos" value="middle" data-bind="captionPos">Middle</label>
+            <label><input type="radio" name="cpos" value="bottom" data-bind="captionPos">Bottom</label>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">Style</div>
+          <div class="seg">
+            <label><input type="radio" name="cstyle" value="outline" data-bind="captionStyle">Outline</label>
+            <label><input type="radio" name="cstyle" value="box" data-bind="captionStyle">Box</label>
+            <label><input type="radio" name="cstyle" value="glow" data-bind="captionStyle">Glow</label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="canim">Entrance animation</label>
+          <select class="input" id="canim" data-bind="captionAnim">
+            <option value="none">None</option>
+            <option value="pop">Pop in</option>
+            <option value="slide">Slide up</option>
+            <option value="type">Typewriter</option>
+          </select>
+        </div>
+        <div class="field"><label>Size <output data-out="captionSize" data-unit=""></output></label>
+          <div class="row"><input type="color" data-bind="captionColor" title="Caption color"><input type="range" min="3" max="12" step="0.5" data-bind="captionSize"></div>
+        </div>
+        <div class="field">
+          <label for="ctiming">Show caption</label>
+          <select class="input" id="ctiming" data-bind="captionTiming">
+            <option value="always">For the whole clip</option>
+            <option value="first">First 4 seconds</option>
+            <option value="last">Last 4 seconds</option>
+          </select>
+        </div>
+        <label class="check"><input type="checkbox" data-bind="captionUpper"> ALL CAPS</label>
+      </section>
+      <section>
+        <h3>Creator handle</h3>
+        <div class="field"><input type="text" data-bind="handle" maxlength="40" placeholder="@yourhandle"></div>
+        <div class="field">
+          <label for="hcorner">Corner</label>
+          <select class="input" id="hcorner" data-bind="handleCorner">
+            <option value="tl">Top left</option>
+            <option value="tr">Top right</option>
+            <option value="bl">Bottom left</option>
+            <option value="br">Bottom right</option>
+          </select>
+        </div>
+        <p class="hint">Turn on <b>Safe</b> under the preview to keep text clear of each app's buttons.</p>
+      </section>
+    </div>
+
+    <!-- AUDIO -->
+    <div class="tab-panel" data-panel="audio" hidden>
+      <section class="vo-section">
+        <h3>Voice-over <span class="pill" id="voCount">0 takes</span></h3>
+        <button class="btn primary block" type="button" id="btnVoRecord" disabled>🎙 Record voice-over</button>
+        <div class="vo-meter"><i id="voMeter"></i></div>
+        <div class="field">
+          <div class="lbl">Start recording from <kbd>V</kbd></div>
+          <div class="seg">
+            <label><input type="radio" name="voFrom" value="start" data-bind="voFrom">Beginning of edit</label>
+            <label><input type="radio" name="voFrom" value="playhead" data-bind="voFrom">Playhead</label>
+          </div>
+        </div>
+        <ol class="vo-list" id="voList"></ol>
+        <span class="btn sm block file-btn">＋ Import voice-over audio<input type="file" id="voImport" accept="audio/*"></span>
+        <details class="vo-settings">
+          <summary>Voice settings</summary>
+          <label class="check"><input type="checkbox" data-bind="voPolish"> Voice polish (EQ + compressor)</label>
+          <div class="field">
+            <label for="voFilterSel">Voice filter</label>
+            <select class="input" id="voFilterSel" data-bind="voFilter">
+              <option value="none">None</option>
+              <option value="radio">Radio / walkie-talkie</option>
+              <option value="megaphone">Megaphone</option>
+            </select>
+          </div>
+          <div class="field"><label>Duck game &amp; music while talking <output data-out="voDuck" data-unit=" dB"></output></label><input type="range" min="0" max="24" step="1" data-bind="voDuck"></div>
+          <label class="check"><input type="checkbox" data-bind="voAuto"> Auto-captions from speech</label>
+          <p class="hint" id="voAutoHint">Uses your browser's speech recognition while recording (Chrome sends the audio to its speech service). You can edit the captions afterwards.</p>
+          <label class="check"><input type="checkbox" data-bind="voSubs"> Show voice-over captions in the video</label>
+          <label class="check"><input type="checkbox" data-bind="voMonitor"> Hear game audio while recording (use headphones)</label>
+          <label class="check"><input type="checkbox" data-bind="voNoise"> Mic noise suppression</label>
+          <div class="field"><label>Mic latency compensation <output data-out="voOffset" data-unit=" ms"></output></label><input type="range" min="-300" max="300" step="5" data-bind="voOffset"></div>
+        </details>
+        <p class="hint">Takes sit on the finished edit's timeline. Change a take's start time to nudge it, and the voice-over is mixed into both export engines.</p>
+      </section>
+      <section>
+        <h3>Game audio</h3>
+        <label class="check"><input type="checkbox" data-bind="muteGame"> Mute game audio</label>
+        <div class="field"><label>Volume <output data-out="gameVol" data-unit="%"></output></label><input type="range" min="0" max="150" data-bind="gameVol"></div>
+      </section>
+      <section>
+        <h3>Music track</h3>
+        <div class="field">
+          <span class="btn sm block file-btn">＋ Add your own music<input type="file" id="musicInput" accept="audio/*"></span>
+          <p class="hint" id="musicName">No music added.</p>
+          <button class="btn sm ghost block" type="button" id="btnRemoveMusic" hidden>Remove music</button>
+        </div>
+        <div class="field"><label>Music volume <output data-out="musicVol" data-unit="%"></output></label><input type="range" min="0" max="150" data-bind="musicVol"></div>
+        <div class="field"><label>Start music at <output data-out="musicStart" data-unit="s"></output></label><input type="range" min="0" max="120" step="0.5" data-bind="musicStart"></div>
+        <p class="hint">The frame-exact engine mixes audio offline at 48 kHz, so it stays in sync with every video frame.</p>
+      </section>
+      <section>
+        <div class="note"><b>Avoid copyright claims:</b> in-game radio and licensed songs are the most common cause of Content ID claims and muted audio. For safer uploads, mute or lower the game audio and add royalty-free music you have the rights to use.</div>
+      </section>
+    </div>
+
+    <!-- POST -->
+    <div class="tab-panel" data-panel="post" hidden>
+      <section>
+        <h3>Post details</h3>
+        <div class="field"><label>Title <span class="counter" id="titleCount">0/100</span></label><input type="text" data-bind="title" maxlength="140" placeholder="Insane getaway on the causeway 😳"></div>
+        <div class="field"><label>Description</label><textarea data-bind="description" rows="3" placeholder="What happened, platform, settings…"></textarea></div>
+        <div class="field"><label>Hashtags</label><input type="text" data-bind="tags" placeholder="#gaming #clips"></div>
+        <div class="chips" id="tagChips"></div>
+        <button class="btn sm block" type="button" id="btnCopyCaption" style="margin-top:12px">Copy caption &amp; hashtags</button>
+      </section>
+      <section>
+        <h3>Before you post</h3>
+        <ul class="checklist">
+          <li><label><input type="checkbox"> Game radio or licensed music is muted or replaced</label></li>
+          <li><label><input type="checkbox"> Footage comes from my own retail gameplay</label></li>
+          <li><label><input type="checkbox"> The thumbnail is my own frame, not official key art</label></li>
+          <li><label><input type="checkbox"> I checked the game publisher's video policy</label></li>
+          <li><label><input type="checkbox"> The title doesn't suggest this is official content</label></li>
+        </ul>
+      </section>
+    </div>
+  </aside>
+</main>
+
+<!-- hidden source video (preview decoding) -->
+<video id="video" class="src-video" playsinline preload="auto"></video>
+<video id="video2" class="src-video" playsinline preload="auto"></video>
+
+<!-- ============ EXPORT MODAL ============ -->
+<div class="modal" id="exportModal" hidden role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+  <div class="modal-card">
+    <button class="modal-x" type="button" id="modalClose" aria-label="Close">×</button>
+
+    <div id="stepConfirm">
+      <h2 class="display" id="exportTitle">Render your clip</h2>
+      <dl class="summary" id="exportSummary"></dl>
+      <div id="exportNotes"></div>
+      <label class="check" id="monitorWrap"><input type="checkbox" id="monitorAudio"> Play audio while rendering (real-time engine)</label>
+      <button class="btn primary block lg" type="button" id="btnStartRender" style="margin-top:10px">Start render</button>
+    </div>
+
+    <div id="stepRender" hidden>
+      <h2 class="display">Rendering…</h2>
+      <canvas class="render-preview" id="renderPreview" width="480" height="270"></canvas>
+      <div class="progress"><i id="progressBar"></i></div>
+      <div class="render-status"><span id="renderStatus">Preparing…</span><span id="renderEta"></span></div>
+      <div class="note info" style="margin-top:16px" id="renderNote">Rendering every frame in exact order. You can switch tabs; the frame-exact engine doesn't depend on playback.</div>
+      <button class="btn block" type="button" id="btnCancelRender" style="margin-top:16px">Cancel</button>
+    </div>
+
+    <div id="stepDone" hidden>
+      <h2 class="display">Ready to post 🔥</h2>
+      <video class="result-video" id="resultVideo" controls playsinline></video>
+      <div class="result-meta" id="resultMeta"></div>
+      <div class="share-main" id="shareMain">
+        <button class="btn primary" type="button" id="btnDownload">⬇ Download</button>
+        <button class="btn" type="button" id="btnNativeShare">↗ Share…</button>
+      </div>
+      <div id="formatWarn"></div>
+
+      <h4>Post to</h4>
+      <div class="platforms" id="platforms"></div>
+      <p class="hint">Picking a platform saves your clip, copies your caption, and opens that platform's upload page. Then attach the file and post.</p>
+
+      <div class="yt-direct" id="ytDirect">
+        <b>Upload directly to YouTube</b>
+        <div id="ytReady">
+          <div class="row">
+            <select class="input" id="ytPrivacy">
+              <option value="private">Private</option>
+              <option value="unlisted">Unlisted</option>
+              <option value="public">Public</option>
+            </select>
+            <button class="btn primary" type="button" id="btnYtUpload">Sign in &amp; upload</button>
+          </div>
+          <div class="progress" id="ytProgressWrap" hidden><i id="ytProgress"></i></div>
+          <p class="hint" id="ytStatus">The upload uses the title, description and hashtags from the Post tab. Vertical clips are tagged #Shorts.</p>
+        </div>
+        <p class="hint" id="ytNotConfigured" hidden>Direct upload isn't set up on this site yet. The site owner needs to add a Google OAuth Client ID in <code>assets/js/config.js</code> (see the README). For now, use the YouTube button above.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ AI EDIT MODAL ============ -->
+<div class="modal" id="aiModal" hidden role="dialog" aria-modal="true" aria-labelledby="aiTitle">
+  <div class="modal-card wide">
+    <button class="modal-x" type="button" id="aiClose" aria-label="Close">×</button>
+    <h2 class="display" id="aiTitle">✨ AI Edit</h2>
+    <div id="aiSetupView">
+    <p class="ai-lead">ClipHeist analyzes your footage on your device (loudness, impacts, motion, flashes and scene cuts), picks the best moments, and builds a ready-to-post edit.</p>
+    <canvas class="ai-graph" id="aiGraph"></canvas>
+    <div class="ai-status-row">
+      <button class="btn accent" type="button" id="btnAiAnalyze">🔍 Analyze footage</button>
+      <div class="ai-status"><span id="aiStatus"></span><div class="progress" hidden><i id="aiProgress"></i></div></div>
+    </div>
+    <div class="ai-grid">
+      <div>
+        <div class="field">
+          <label for="aiTargetSel">Target</label>
+          <select class="input" id="aiTargetSel" data-bind="aiTarget"></select>
+        </div>
+        <div class="field">
+          <label for="aiOrderSel">Order</label>
+          <select class="input" id="aiOrderSel" data-bind="aiOrder">
+            <option value="hook">Open with the biggest moment</option>
+            <option value="chrono">Chronological</option>
+          </select>
+        </div>
+        <label class="check"><input type="checkbox" data-bind="aiReframe"> Auto-reframe vertical edits to follow the action</label>
+        <label class="check"><input type="checkbox" data-bind="aiFx"> Apply the style's look, effects &amp; transitions</label>
+        <label class="check"><input type="checkbox" data-bind="aiBeat"> Cut to the beat of my music</label>
+        <p class="hint" id="aiBeatHint"></p>
+        <label class="check"><input type="checkbox" data-bind="aiCaptions"> Write title, hashtags &amp; captions</label>
+        <div id="aiCloudRow">
+          <label class="check"><input type="checkbox" data-bind="aiCloud"> Use cloud AI for the writing (sends ~6 small frames)</label>
+          <div class="field"><textarea data-bind="aiNotes" rows="2" maxlength="500" placeholder="Optional: tell the AI what happened, e.g. 'escaped 5 cop cars on a dirt bike'"></textarea></div>
+        </div>
+      </div>
+      <div>
+        <div class="lbl">Style</div>
+        <div class="ai-styles" id="aiStyleGrid"></div>
+      </div>
+    </div>
+    <div class="ai-actions">
+      <button class="btn primary lg" type="button" id="btnAiCreate">✨ Create my edit</button>
+      <button class="btn accent" type="button" id="btnAiPreview" hidden>▶ Preview edit</button>
+      <button class="btn ghost" type="button" id="btnAiUndo" hidden>↶ Undo AI edit</button>
+    </div>
+    </div>
+
+    <!-- ---- preview step ---- -->
+    <div id="aiPreviewView" hidden>
+      <div class="aip-head">
+        <div class="aip-titles">
+          <b id="aipTitle">Your edit</b>
+          <span id="aipMeta"></span>
+        </div>
+        <div class="aip-formats" id="aipFormats" role="group" aria-label="Output format"></div>
+      </div>
+      <div class="aip-stage" id="aipStage">
+        <canvas id="aipCanvas" width="360" height="640" aria-label="Preview of the AI edit"></canvas>
+        <button class="aip-bigplay" type="button" id="aipBigPlay" aria-label="Play preview">▶</button>
+      </div>
+      <div class="aip-controls">
+        <button class="tbtn play" type="button" id="aipPlay" title="Play / pause (Space)">▶</button>
+        <button class="tbtn" type="button" id="aipRestart" title="Restart">⟲</button>
+        <button class="tbtn" type="button" id="aipPrev" title="Previous clip">⏮</button>
+        <button class="tbtn" type="button" id="aipNext" title="Next clip">⏭</button>
+        <div class="aip-scrub">
+          <div class="aip-segs" id="aipSegs"></div>
+          <input type="range" id="aipScrub" min="0" max="1" step="0.01" value="0" aria-label="Seek through the edit">
+        </div>
+        <span class="timecode" id="aipTime">0:00.00 <span>/ 0:00.00</span></span>
+      </div>
+      <div class="aip-grid">
+        <div>
+          <h4>Moments <span class="pill" id="aipCount"></span></h4>
+          <ol class="aip-moments" id="aipMoments"></ol>
+        </div>
+        <div>
+          <h4>Post copy</h4>
+          <div class="field"><label>Title</label><input type="text" data-bind="title" maxlength="140"></div>
+          <div class="field"><label>Opening caption (first 4 s)</label><input type="text" data-bind="caption" maxlength="140" placeholder="e.g. WAIT FOR IT…"></div>
+          <div class="field"><label>Hashtags</label><input type="text" data-bind="tags"></div>
+        </div>
+      </div>
+      <p class="hint aip-export-hint"><span id="aipExportSpec"></span> · <a href="#" id="aipExportSettings">Export settings…</a></p>
+      <div class="ai-actions">
+        <button class="btn ghost" type="button" id="aipBack">← Adjust &amp; regenerate</button>
+        <button class="btn ghost" type="button" id="aipUndo">↶ Undo</button>
+        <button class="btn" type="button" id="aipStudio">Open in Studio</button>
+        <button class="btn primary lg" type="button" id="aipExport">⬇ Export this edit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/youtube.js"></script>
+<script src="assets/js/media/demux.js"></script>
+<script src="assets/js/media/mp4mux.js"></script>
+<script src="assets/js/media/exact.js"></script>
+<script src="assets/js/ai/analyze.js"></script>
+<script src="assets/js/editor.js"></script>
+<script>
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  }
+</script>
+</body>
+</html>

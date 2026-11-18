@@ -1,0 +1,13 @@
+{
+  "name": "ClipHeist Studio",
+  "short_name": "ClipHeist",
+  "description": "Trim, reframe, caption and share gameplay clips, entirely in your browser.",
+  "start_url": "editor.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0910",
+  "theme_color": "#0a0910",
+  "icons": [
+    { "src": "assets/img/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

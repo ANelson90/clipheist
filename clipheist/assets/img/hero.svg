@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid slice">
+  <!-- Original illustration: generic coastal city at sunset. No game assets. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b0f3a"/>
+      <stop offset=".45" stop-color="#7a1f6b"/>
+      <stop offset=".75" stop-color="#ff4d6d"/>
+      <stop offset="1" stop-color="#ffb347"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe17a"/>
+      <stop offset="1" stop-color="#ff3d81"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b1450"/>
+      <stop offset="1" stop-color="#0a0910"/>
+    </linearGradient>
+    <clipPath id="sunclip"><rect x="0" y="0" width="960" height="372"/></clipPath>
+  </defs>
+  <rect width="960" height="540" fill="url(#sky)"/>
+  <g clip-path="url(#sunclip)">
+    <circle cx="560" cy="330" r="150" fill="url(#sun)"/>
+    <g fill="#ff4d6d" opacity=".9">
+      <rect x="400" y="300" width="320" height="6"/>
+      <rect x="400" y="322" width="320" height="8"/>
+      <rect x="400" y="346" width="320" height="10"/>
+    </g>
+  </g>
+  <!-- skyline -->
+  <g fill="#170a26">
+    <rect x="40" y="250" width="54" height="125"/>
+    <rect x="100" y="210" width="40" height="165"/>
+    <rect x="146" y="270" width="60" height="105"/>
+    <rect x="214" y="180" width="36" height="195"/>
+    <rect x="256" y="235" width="70" height="140"/>
+    <rect x="740" y="220" width="46" height="155"/>
+    <rect x="792" y="260" width="64" height="115"/>
+    <rect x="862" y="200" width="40" height="175"/>
+    <rect x="906" y="245" width="54" height="130"/>
+  </g>
+  <g fill="#ffb347" opacity=".55">
+    <rect x="108" y="224" width="6" height="6"/><rect x="122" y="240" width="6" height="6"/>
+    <rect x="222" y="200" width="6" height="6"/><rect x="236" y="230" width="6" height="6"/>
+    <rect x="750" y="236" width="6" height="6"/><rect x="870" y="214" width="6" height="6"/>
+    <rect x="884" y="250" width="6" height="6"/><rect x="270" y="252" width="6" height="6"/>
+  </g>
+  <rect y="372" width="960" height="168" fill="url(#sea)"/>
+  <g stroke="#ff8a5b" stroke-width="3" opacity=".5">
+    <line x1="470" y1="392" x2="650" y2="392"/>
+    <line x1="500" y1="412" x2="620" y2="412"/>
+    <line x1="525" y1="432" x2="595" y2="432"/>
+  </g>
+  <!-- palms -->
+  <g fill="none" stroke="#0a0610" stroke-linecap="round">
+    <path d="M330 540 C 340 470, 352 420, 372 360" stroke-width="12"/>
+    <path d="M372 360 q -60 -10 -95 25 M372 360 q -30 -45 -90 -40 M372 360 q 20 -50 75 -50 M372 360 q 55 -5 85 35 M372 360 q 5 -60 -20 -85" stroke-width="9"/>
+    <path d="M690 540 C 676 480, 668 440, 650 390" stroke-width="10"/>
+    <path d="M650 390 q -50 -6 -80 20 M650 390 q -24 -40 -76 -34 M650 390 q 16 -42 64 -42 M650 390 q 48 -2 72 30" stroke-width="8"/>
+  </g>
+  <!-- road + car silhouette -->
+  <path d="M0 500 L960 470 L960 540 L0 540Z" fill="#0a0610"/>
+  <g fill="#0a0610">
+    <path d="M90 478 h120 l30 -18 h70 l34 18 h40 v22 H90z"/>
+  </g>
+  <g fill="#ff3d81"><circle cx="388" cy="486" r="4"/></g>
+  <g fill="#ffe17a"><circle cx="96" cy="488" r="4"/></g>
+</svg>

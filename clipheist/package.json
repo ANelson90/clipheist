@@ -1,0 +1,17 @@
+{
+  "name": "clipheist",
+  "version": "1.0.0",
+  "private": true,
+  "description": "In-browser gameplay clip studio: AI Edit, effects, transitions, voice-over and frame-exact exports. No build step, no server required.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "check": "node scripts/check.mjs",
+    "test:unit": "node --test",
+    "test:e2e": "python3 -m pytest tests/e2e",
+    "test": "npm run check && npm run test:unit"
+  }
+}
